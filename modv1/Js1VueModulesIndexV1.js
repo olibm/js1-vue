@@ -224,7 +224,15 @@ export default class Js1VueModulesIndexV1 {
         // Queue final step
         this.bootFunctions.push(context => {
             if (this.routes.length) {
-                context.router.addRoutes(this.routes);
+                if (context.router.addRoute) {
+                    this.routes.forEach(route => context.router.addRoute(route));
+                }
+                else if (context.router.addRoutes) {
+                    context.router.addRoutes(this.routes);
+                }
+                else {
+                    console.warn(' Unable to add routes because router.addRoute is missing');
+                }
             }
 
             this.leftMenuItems.splice(0, this.leftMenuItems.length, ...sortBy(this.leftMenuItems, x => x.order))
