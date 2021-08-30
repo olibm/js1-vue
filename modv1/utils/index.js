@@ -9,9 +9,20 @@ const installers = [
     require('./patchRoute').default,
 ];
 
+function getVueVersion(app, Vue) {
+    const ver = (app && app.version) || (Vue && Vue.version) || '';
+    if (!ver || typeof ver !== 'string') throw new Error('getVueVersion error');
+    return {
+        vueVersion: ver,
+        vueMajor: Number(ver.split('.')[0]),
+    }
+}
+
 const sym = Symbol('$js1');
-export function installVueUtils(Vue) {
-    if (Vue.$js1 || Vue.prototype.$js1) {
+export function installVueUtils(app, Vue) {
+    const { vueMajor } = getVueVersion(app, Vue);
+
+    if (Vue && (Vue.$js1 || Vue.prototype.$js1)) {
         throw new Error('$js1 commons cannot be initialized twice');
     }
 
@@ -44,25 +55,33 @@ export function installVueUtils(Vue) {
     const withBind = {};
     utils.filter(u => u.bind).forEach(u => withBind[u.name] = u.function);
 
-    Vue.$js1 = { ...withoutBind };
+    if (vueMajor >= 3) {
+        // TODO: add withBind helpers if globalProperties supports 'this' context
+        app.config.globalProperties.$js1 = Object.assign(app.config.globalProperties.$js1 || {}, {
+            ...withoutBind,
+        });
+    }
+    else {
+        Vue.$js1 = { ...withoutBind };
 
-    // Preserve 'this' from Vue. Feels a bit hacky but it works.
-    Object.defineProperty(Vue.prototype, '$js1', {
-        get() {
-            if (!this[sym]) {
-                const o = this[sym] = {
-                    ...withoutBind,
-                };
-                const self = this;
-                for (let key in withBind) {
-                    o[key] = new Proxy(withBind[key], {
-                        apply(target, _, args) {
-                            return target.apply(self, args);
-                        }
-                    })
+        // Preserve 'this' from Vue. Feels a bit hacky but it works.
+        Object.defineProperty(Vue.prototype, '$js1', {
+            get() {
+                if (!this[sym]) {
+                    const o = this[sym] = {
+                        ...withoutBind,
+                    };
+                    const self = this;
+                    for (let key in withBind) {
+                        o[key] = new Proxy(withBind[key], {
+                            apply(target, _, args) {
+                                return target.apply(self, args);
+                            }
+                        })
+                    }
                 }
+                return this[sym];
             }
-            return this[sym];
-        }
-    });
+        });
+    }
 }

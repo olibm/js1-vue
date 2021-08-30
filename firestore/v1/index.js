@@ -11,7 +11,13 @@ export * from './RestCollectionHandler'
 let _defaultFirestore = null;
 function getDefaultFirestore() {
     if (!_defaultFirestore) {
-        _defaultFirestore = getFirebase().firestore();
+        const fb = getFirebase();
+        if (fb && fb.firestore) {
+            _defaultFirestore = fb.firestore();
+        }
+        else {
+            console.log('firebase/firestore module is not loaded');
+        }
     }
     return _defaultFirestore;
 }
